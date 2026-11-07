@@ -11,14 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Extract Project ZIP
         run: |
           unzip -o 18_PLUS_LAUNCHER_GITHUB_PROJECT.zip -d .
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,14 +29,28 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Configure Android SDK
+      - name: Locate Android SDK Manager
+        shell: bash
         run: |
-          echo "$ANDROID_HOME/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager 2>/dev/null | head -n 1)
 
-      - name: Build Debug APK
-        run: gradle --no-daemon assembleDebug
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager tidak ditemukan"
+            find "$ANDROID_HOME" -maxdepth 5 -type f -name sdkmanager
+            exit 1
+          fi
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+
+      - name: Install Android SDK
+        run: |
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build APK
+        run: |
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
